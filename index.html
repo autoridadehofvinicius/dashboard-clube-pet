@@ -53,7 +53,7 @@ h1,h2,h3{margin:0;font-weight:600}
 .credit .inner b{color:var(--ink2);font-weight:600}
 
 .controls{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:22px 0 4px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.tabbar{display:flex;gap:22px}
+.tabbar{display:flex;gap:6px 22px;flex-wrap:wrap}
 .tabbar button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:15px;font-weight:600;padding:6px 2px;cursor:pointer;border-bottom:2px solid transparent}
 .tabbar button:hover{color:var(--ink2)}.tabbar button.on{color:var(--ink);border-bottom-color:var(--gold)}
 .seg{display:inline-flex;background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:3px}
@@ -111,6 +111,17 @@ footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);font-si
 footer .dev b{color:var(--ink);font-weight:600}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:40px;text-align:center;color:var(--ink2)}
 .hide{display:none}
+.aviso{margin-top:16px;padding:12px 15px;border-radius:12px;background:var(--warn-soft);color:var(--warn);font-size:13.5px;border:1px solid var(--line)}
+.aviso b{color:inherit}
+.tblwrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+table.t{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+table.t th{text-align:right;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:12px 14px;border-bottom:1px solid var(--line)}
+table.t td{text-align:right;padding:12px 14px;border-bottom:1px solid var(--line2);font-variant-numeric:tabular-nums}
+table.t tr:last-child td{border-bottom:0}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t td:first-child b{font-weight:600}
+table.t td .s{display:block;font-size:11.5px;color:var(--muted)}
+.fonte{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.55}
 @media(max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
 @media(max-width:520px){.kpis{grid-template-columns:1fr}.controls{flex-direction:column;align-items:flex-start}}
 </style>
@@ -128,6 +139,7 @@ footer .dev b{color:var(--ink);font-weight:600}
     <div class="tabbar" id="tabbar">
       <button data-tab="geral" class="on">Visão geral</button>
       <button data-tab="criativos">Anúncios no ar</button>
+      <button data-tab="leads">Leads e agendamentos</button>
     </div>
     <div class="periodwrap">
       <span class="lbl">Período</span>
@@ -151,6 +163,19 @@ footer .dev b{color:var(--ink);font-weight:600}
 
   <div id="viewCriativos" class="hide">
     <section><div class="eyebrow">Todos os anúncios no ar · <span id="janelaC">—</span></div><div id="criativos"></div></section>
+  </div>
+
+  <div id="viewLeads" class="hide">
+    <section><div class="eyebrow">Do anúncio ao agendamento · <span id="janelaL">—</span></div><div class="kpis" id="kpisL"></div><div id="avisoL"></div></section>
+    <section><div class="eyebrow">O que aconteceu com cada lead</div>
+      <div class="grid2" style="grid-template-columns:1fr 1fr">
+        <div class="panel"><h3>Leads que vieram do anúncio</h3><div class="hint">Motivo que a equipe marcou ao encerrar a conversa</div><div class="cbar" id="motAd"></div></div>
+        <div class="panel"><h3>Leads que vieram por fora</h3><div class="hint">Orgânico, indicação e clientes antigos, para comparar</div><div class="cbar" id="motOut"></div></div>
+      </div>
+    </section>
+    <section><div class="eyebrow">Por anúncio</div><div class="tblwrap" id="tabAds"></div>
+      <div class="fonte">Conversas: contadas pelo Meta. Leads e agendamentos: contados no SM Click, uma vez por pessoa. Se a pessoa agendou em qualquer conversa, conta como agendou.</div>
+    </section>
   </div>
 
   <footer><span class="dev">Desenvolvido por <b>Vinicius Augusto de Souza</b> · Gestão de Tráfego &amp; IA</span><span id="foot">—</span></footer>
@@ -240,11 +265,53 @@ footer .dev b{color:var(--ink);font-weight:600}
       '</div>';}).join("")+'</div>';
   }
 
+  var ROT={agendou:"Agendou",aberto:"Em aberto",sem_resposta:"Não respondeu",valor:"Desistiu por valor",info:"Só informação",atendido:"Atendimento realizado",sem_motivo:"Encerrado sem motivo"};
+  var CORL={agendou:"var(--good)",aberto:"var(--warn)",sem_motivo:"var(--warn)"};
+  function rotL(l){return l.cat==="outro"?l.mot:ROT[l.cat];}
+  function barras(ls){
+    if(!ls.length)return '<div class="empty" style="padding:24px">Nenhum lead no período.</div>';
+    var g={};ls.forEach(function(l){var k=rotL(l);(g[k]=g[k]||{n:0,cat:l.cat}).n++;});
+    var ks=Object.keys(g).sort(function(a,b){return (g[b].cat==="agendou")-(g[a].cat==="agendou")||g[b].n-g[a].n;});
+    var t=ls.length,max=Math.max.apply(null,ks.map(function(k){return g[k].n;}));
+    return ks.map(function(k){var n=g[k].n;
+      return '<div class="row"><div class="top-l"><b>'+esc(k)+'</b><span class="v tnum">'+INT(n)+' <span style="color:var(--muted);font-size:12px">'+Math.round(n/t*100)+'%</span></span></div><div class="track"><div class="fill" style="width:'+(n/max*100).toFixed(1)+'%;background:'+(CORL[g[k].cat]||"var(--ink2)")+'"></div></div></div>';}).join("");
+  }
+  function renderLeads(days){
+    var lab=LBL[days]||("últimos "+days+" dias");document.getElementById("janelaL").textContent=lab;
+    var cut=shiftISO(today,-(days-1));
+    var L=(D.leads||[]).filter(function(l){return l.d>=cut&&l.d<=today;});
+    var ad=L.filter(function(l){return l.ad;}),fora=L.filter(function(l){return !l.ad;});
+    var gastos=within(D.ads_todos||[],days),sp=0,nomes={},porAd={};
+    (D.ads_todos||[]).slice().sort(function(a,b){return a.d<b.d?-1:1;}).forEach(function(r){if(r.a)nomes[r.id]=r.a;});
+    gastos.forEach(function(r){sp+=r.sp||0;var o=porAd[r.id]||(porAd[r.id]={sp:0,conv:0,leads:0,ag:0,ab:0,t:""});o.sp+=r.sp||0;o.conv+=r.ld||0;});
+    ad.forEach(function(l){var o=porAd[l.ad]||(porAd[l.ad]={sp:0,conv:0,leads:0,ag:0,ab:0,t:""});o.leads++;o.t=o.t||l.adt;if(l.cat==="agendou")o.ag++;if(l.cat==="aberto")o.ab++;});
+    var ag=ad.filter(function(l){return l.cat==="agendou";}).length,ab=ad.filter(function(l){return l.cat==="aberto";}).length,nao=ad.length-ag-ab;
+    var cont={};ad.forEach(function(l){if(l.cat!=="agendou"&&l.cat!=="aberto"){var k=rotL(l);cont[k]=(cont[k]||0)+1;}});
+    var topNao=Object.keys(cont).sort(function(a,b){return cont[b]-cont[a];})[0];
+    var cpa=ag?sp/ag:0;
+    var K=[
+      {lab:"Leads do anúncio",val:INT(ad.length),sub:"de "+INT(L.length)+" leads no WhatsApp"},
+      {lab:"Agendaram",val:INT(ag),sub:ad.length?'<span class="tag '+(ag?"good":"warn")+'">'+Math.round(ag/ad.length*100)+'% dos leads</span>':"—"},
+      {lab:"Custo por agendamento",val:ag?'<span class="cur">R$</span>'+BRL(cpa):"—",sub:ag?"R$ "+BRL(sp)+" investidos":(sp?"R$ "+BRL(sp)+" investidos, nenhum agendamento":"sem gasto")},
+      {lab:"Não agendaram",val:INT(nao),sub:topNao?"mais comum: "+esc(topNao.toLowerCase()):"—"},
+      {lab:"Em aberto",val:INT(ab),sub:ab?'<span class="tag warn">sem motivo marcado</span>':"tudo encerrado"}
+    ];
+    document.getElementById("kpisL").innerHTML=K.map(function(k){return '<div class="kpi"><div class="rail"></div><div class="lab">'+k.lab+'</div><div class="val tnum">'+k.val+'</div><div class="sub">'+k.sub+'</div></div>';}).join("");
+    document.getElementById("avisoL").innerHTML=ab?'<div class="aviso"><b>'+ab+' lead'+(ab>1?"s":"")+' do anúncio ainda sem motivo de finalização.</b> Enquanto a conversa não é encerrada com um motivo no SM Click, não dá pra saber se '+(ab>1?"eles agendaram":"agendou")+'. Por isso o custo por agendamento pode estar mais alto do que o real.</div>':"";
+    document.getElementById("motAd").innerHTML=barras(ad);
+    document.getElementById("motOut").innerHTML=barras(fora);
+    var ids=Object.keys(porAd).filter(function(id){var o=porAd[id];return o.sp>0||o.leads>0;}).sort(function(a,b){return porAd[b].leads-porAd[a].leads||porAd[b].sp-porAd[a].sp;});
+    document.getElementById("tabAds").innerHTML=ids.length?'<table class="t"><thead><tr><th>Anúncio</th><th>Investido</th><th>Conversas</th><th>Leads</th><th>Agendaram</th><th>Custo / agend.</th><th>Em aberto</th></tr></thead><tbody>'+
+      ids.map(function(id){var o=porAd[id],nm=nomes[id]||o.t||id;
+        return '<tr><td><b>'+esc(nm)+'</b>'+(o.t&&o.t!==nm?'<span class="s">'+esc(o.t)+'</span>':'')+'</td><td>R$ '+BRL(o.sp)+'</td><td>'+INT(o.conv)+'</td><td>'+INT(o.leads)+'</td><td style="color:'+(o.ag?"var(--good)":"inherit")+'">'+INT(o.ag)+'</td><td>'+(o.ag?"R$ "+BRL(o.sp/o.ag):"—")+'</td><td style="color:'+(o.ab?"var(--warn)":"inherit")+'">'+INT(o.ab)+'</td></tr>';}).join("")+'</tbody></table>'
+      :'<div class="empty">Nenhum anúncio com gasto ou lead no período.</div>';
+  }
+
   var period=14;
-  document.getElementById("periods").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;period=+b.getAttribute("data-p");[].forEach.call(this.children,function(c){c.classList.toggle("on",c===b);});render(period);});
+  document.getElementById("periods").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;period=+b.getAttribute("data-p");[].forEach.call(this.children,function(c){c.classList.toggle("on",c===b);});render(period);renderLeads(period);});
   document.getElementById("tabbar").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;var t=b.getAttribute("data-tab");[].forEach.call(this.children,function(c){c.classList.toggle("on",c===b);});
-    document.getElementById("viewGeral").classList.toggle("hide",t!=="geral");document.getElementById("viewCriativos").classList.toggle("hide",t!=="criativos");});
-  render(period);
+    document.getElementById("viewGeral").classList.toggle("hide",t!=="geral");document.getElementById("viewCriativos").classList.toggle("hide",t!=="criativos");document.getElementById("viewLeads").classList.toggle("hide",t!=="leads");});
+  render(period);renderLeads(period);
 })();
 </script>
 </body>
